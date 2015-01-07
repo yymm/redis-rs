@@ -18,17 +18,13 @@ fn do_print_max_entry_limits(con: &redis::Connection) -> redis::RedisResult<()> 
 
     println!("Max entry limits:");
 
-    // because our HashSet stores keys as actual strings we cannot use
-    // the find method because of a type mismatch (it takes strings and
-    // not slices).  We can however avoid the allocation we can use the
-    // find_equiv method.
-    println!("  max-intset:        {}", config.find_equiv(
+    println!("  max-intset:        {}", config.get(
         "set-max-intset-entries").unwrap_or(&0));
-    println!("  hash-max-ziplist:  {}", config.find_equiv
-        ("hash-max-ziplist-entries").unwrap_or(&0));
-    println!("  list-max-ziplist:  {}", config.find_equiv(
+    println!("  hash-max-ziplist:  {}", config.get(
+        "hash-max-ziplist-entries").unwrap_or(&0));
+    println!("  list-max-ziplist:  {}", config.get(
         "list-max-ziplist-entries").unwrap_or(&0));
-    println!("  zset-max-ziplist:  {}", config.find_equiv(
+    println!("  zset-max-ziplist:  {}", config.get(
         "zset-max-ziplist-entries").unwrap_or(&0));
 
     Ok(())
@@ -111,14 +107,14 @@ fn do_atomic_increment(con: &redis::Connection) -> redis::RedisResult<()> {
     let _ : () = try!(con.set(key, 42i));
 
     // run the transaction block.
-    let (new_val,) : (int,) = transaction(con, [key].as_slice(), |pipe| {
+    let (new_val,) : (int,) = try!(transaction(con, [key].as_slice(), |pipe| {
         // load the old value, so we know what to increment.
         let val : int = try!(con.get(key));
         // increment
         pipe
             .set(key, val + 1).ignore()
             .get(key).query(con)
-    }).unwrap();
+    }));
 
     // and print the result
     println!("New value: {}", new_val);
